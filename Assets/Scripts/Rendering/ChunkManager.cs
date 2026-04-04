@@ -34,9 +34,9 @@ namespace Rendering
         [Header("Fog")]
         [SerializeField] Color fogColor = new Color(0.65f, 0.77f, 0.90f);
 
-        NoiseGenerator    _noiseGen;
+        Lib.TerrainGen.NoiseGenerator _noiseGen;
         HeightmapReadback _readback;
-        MeshGenerator     _meshGen;
+        MeshGenerator _meshGen;
 
         readonly Dictionary<Vector2Int, Chunk>     _chunks  = new();
         readonly Dictionary<Vector2Int, ChunkView> _views   = new();
@@ -75,13 +75,25 @@ namespace Rendering
 
         void Awake()
         {
-            _noiseGen = new NoiseGenerator(noiseShader);
+            _noiseGen = new Lib.TerrainGen.NoiseGenerator(noiseShader);
             _readback = new HeightmapReadback();
             _meshGen  = new MeshGenerator(heightMultiplier, heightCurve);
             _viewer   = Camera.main.transform;
 
+            SyncTerrainMaterialSettings();
             SetupFog();
             CreateWaterPlane();
+        }
+
+        void SyncTerrainMaterialSettings()
+        {
+            if (terrainMaterial == null) return;
+
+            terrainMaterial.SetFloat("_MaxHeight", heightMultiplier);
+
+            float normalizedWaterLevel = Mathf.Clamp01(heightCurve.Evaluate(noiseSettings.seaLevel));
+            terrainMaterial.SetFloat("_WaterLevel", normalizedWaterLevel);
+            terrainMaterial.SetFloat("_SandLevel", normalizedWaterLevel);
         }
 
         void SetupFog()
@@ -89,11 +101,11 @@ namespace Rendering
             float chunkWorldSize = noiseSettings.chunkSize - 1;
             float maxViewDist    = viewDistance * chunkWorldSize;
 
-            RenderSettings.fog              = true;
-            RenderSettings.fogMode          = FogMode.Linear;
+            RenderSettings.fog               = true;
+            RenderSettings.fogMode           = FogMode.Linear;
             RenderSettings.fogStartDistance  = maxViewDist * 0.45f;
             RenderSettings.fogEndDistance    = maxViewDist * 0.92f;
-            RenderSettings.fogColor         = fogColor;
+            RenderSettings.fogColor          = fogColor;
 
             Camera.main.backgroundColor = fogColor;
         }
@@ -138,7 +150,7 @@ namespace Rendering
 
             if (_waterPlane != null)
             {
-                float waterY = noiseSettings.waterLevel * heightMultiplier;
+                float waterY = heightCurve.Evaluate(noiseSettings.seaLevel) * heightMultiplier;
                 _waterPlane.transform.position = new Vector3(
                     _viewer.position.x, waterY, _viewer.position.z);
             }
@@ -188,8 +200,7 @@ namespace Rendering
             _pending.Add(coord);
             var chunk = new Chunk(coord) { State = ChunkState.GeneratingNoise };
             chunk.RequestTime     = Time.realtimeSinceStartup;
-            chunk.GpuTexture      = _noiseGen.Dispatch(noiseSettings, coord,
-                                                        out var moistRT);
+            chunk.GpuTexture      = _noiseGen.Dispatch(noiseSettings, coord, out var moistRT);
             chunk.MoistureTexture = moistRT;
             _readback.Request(chunk, OnChunkReady);
         }
@@ -223,8 +234,7 @@ namespace Rendering
         void SpawnChunkView(Chunk chunk)
         {
             Mesh mesh = _meshGen.BuildMesh(chunk.Heightmap, noiseSettings.chunkSize);
-            var view  = new ChunkView(chunk.Coord, noiseSettings.chunkSize,
-                                      terrainMaterial, transform);
+            var view  = new ChunkView(chunk.Coord, noiseSettings.chunkSize, terrainMaterial, transform);
             view.ApplyMesh(mesh);
             view.SetTerrainProperties(chunk.MoistureTexture, heightMultiplier);
             _views[chunk.Coord] = view;
@@ -251,7 +261,9 @@ namespace Rendering
                 view.Destroy();
 
             _meshGen  = new MeshGenerator(heightMultiplier, heightCurve);
-            _noiseGen = new NoiseGenerator(noiseShader);
+            _noiseGen = new Lib.TerrainGen.NoiseGenerator(noiseShader);
+
+            SyncTerrainMaterialSettings();
 
             _chunks.Clear();
             _views.Clear();

@@ -105,7 +105,7 @@ Material:
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BlendOp: 0
-    - _BlendWidth: 0.04
+    - _BlendWidth: 0.005
     - _BumpScale: 1
     - _CameraFadingEnabled: 0
     - _CameraFarFadeDistance: 2
@@ -129,17 +129,20 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
+    - _GrassMaxLevel: 0.647
     - _LightingEnabled: 0
-    - _MaxHeight: 40
+    - _MaxHeight: 70
     - _Metallic: 0
     - _Mode: 0
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _RockLevel: 0.5
-    - _RockSlopeThreshold: 0.5
-    - _SandLevel: 0.22
+    - _RockLevel: 0.615
+    - _RockSlopeThreshold: 0.119
+    - _SandLevel: 0.3913726
+    - _ShoreSlopeThreshold: 0.165
+    - _ShoreWidth: 0.008
     - _SlopeDarkening: 0.511
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
@@ -150,7 +153,7 @@ Material:
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Surface: 0
-    - _WaterLevel: 0.15
+    - _WaterLevel: 0.3913726
     - _WorkflowMode: 1
     - _ZWrite: 1
     m_Colors:

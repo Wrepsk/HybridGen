@@ -1,7 +1,7 @@
 // HybridGen/TerrainSurface
-// URP terrain shader that blends six biome zones using:
+// URP terrain shader that blends shore, vegetation, rock, and snow using:
 //   - World-space vertex height (normalized by _MaxHeight)
-//   - Mesh surface normal slope
+//   - Surface steepness from dot(normal, up)
 //   - Per-chunk moisture texture (set via MaterialPropertyBlock)
 Shader "HybridGen/TerrainSurface"
 {
@@ -13,9 +13,12 @@ Shader "HybridGen/TerrainSurface"
 
         // Height thresholds (normalized 0-1 relative to _MaxHeight)
         _WaterLevel          ("Water Level",          Range(0,1)) = 0.15
-        _SandLevel           ("Sand Level",           Range(0,1)) = 0.22
-        _RockLevel           ("Rock Level",           Range(0,1)) = 0.75
-        _RockSlopeThreshold  ("Rock Slope Threshold", Range(0,1)) = 0.50
+        _SandLevel           ("Shore Top",            Range(0,1)) = 0.22
+        _ShoreWidth          ("Shore Width",          Range(0.0,0.2)) = 0.05
+        _GrassMaxLevel       ("Grass Max Level",      Range(0,1)) = 0.58
+        _RockLevel           ("Snow Level",           Range(0,1)) = 0.75
+        _RockSlopeThreshold  ("Steepness Threshold",  Range(0,1)) = 0.50
+        _ShoreSlopeThreshold ("Shore Steepness Max",  Range(0,1)) = 0.28
         _BlendWidth          ("Blend Width",          Range(0.005,0.15)) = 0.04
 
         // Biome colors
@@ -65,8 +68,11 @@ Shader "HybridGen/TerrainSurface"
                 float  _MaxHeight;
                 float  _WaterLevel;
                 float  _SandLevel;
+                float  _ShoreWidth;
+                float  _GrassMaxLevel;
                 float  _RockLevel;
                 float  _RockSlopeThreshold;
+                float  _ShoreSlopeThreshold;
                 float  _BlendWidth;
                 float4 _WaterColor;
                 float4 _SandColor;
@@ -118,37 +124,47 @@ Shader "HybridGen/TerrainSurface"
                 // ------ moisture from per-chunk GPU texture ----------------
                 float moisture = SAMPLE_TEXTURE2D(_MoistureMap, sampler_MoistureMap, IN.uv).r;
 
-                // ------ slope (0 = flat, 1 = vertical cliff) ---------------
-                float slope = 1.0 - saturate(dot(normalWS, float3(0, 1, 0)));
+                // ------ steepness from dot(normal, up) ---------------------
+                float3 upDirWS   = float3(0, 1, 0);
+                float  upDot     = saturate(dot(normalWS, upDirWS));
+                float  steepness = 1.0 - upDot;
+                float  shoreTop  = saturate(max(_SandLevel, _WaterLevel + _ShoreWidth));
 
                 float bw = _BlendWidth; // alias for readability
 
                 // ------ biome weight calculation ---------------------------
-                // Each weight is non-negative and they sum to ~1.
+                // Each weight is non-negative and the bands stay continuous.
 
                 // Water: below _WaterLevel
                 float wWater = 1.0 - smoothstep(_WaterLevel - bw, _WaterLevel + bw, heightN);
 
-                // Sand: narrow band just above water
-                float wSand = smoothstep(_WaterLevel - bw, _WaterLevel + bw, heightN)
-                            * (1.0 - smoothstep(_SandLevel - bw, _SandLevel + bw, heightN));
+                // Shore band: sand on flatter coasts, rock on steep coasts.
+                float wShore = smoothstep(_WaterLevel - bw, _WaterLevel + bw, heightN)
+                             * (1.0 - smoothstep(shoreTop - bw, shoreTop + bw, heightN));
+                float shoreFlat = 1.0 - smoothstep(_ShoreSlopeThreshold - bw,
+                                                   _ShoreSlopeThreshold + bw,
+                                                   steepness);
+                float wSand = wShore * shoreFlat;
+                float wRockyShore = wShore * (1.0 - shoreFlat);
 
-                // Above sand band
-                float aboveSand = smoothstep(_SandLevel - bw, _SandLevel + bw, heightN);
+                // Above the shore band, split flat ground from steep slopes.
+                float aboveShore = smoothstep(shoreTop - bw, shoreTop + bw, heightN);
+                float steepRock  = smoothstep(_RockSlopeThreshold - bw,
+                                              _RockSlopeThreshold + bw,
+                                              steepness);
+                float flatGround = aboveShore * (1.0 - steepRock);
 
-                // Rock: steep slopes (any elevation above sand)
-                float wRock = aboveSand
-                            * smoothstep(_RockSlopeThreshold - 0.08, _RockSlopeThreshold + 0.08, slope);
+                // High flat ground turns barren before the snow line.
+                float grassAllowed = 1.0 - smoothstep(_GrassMaxLevel - bw,
+                                                      _GrassMaxLevel + bw,
+                                                      heightN);
+                float snowMask = smoothstep(_RockLevel - bw, _RockLevel + bw, heightN);
+                float wSnow = flatGround * snowMask;
+                float wVeg  = flatGround * (1.0 - snowMask) * grassAllowed;
+                float wHighBare = flatGround * (1.0 - snowMask) * (1.0 - grassAllowed);
 
-                // Flat ground above sand
-                float flat = aboveSand
-                           * (1.0 - smoothstep(_RockSlopeThreshold - 0.08, _RockSlopeThreshold + 0.08, slope));
-
-                // Snow: flat + high elevation
-                float wSnow = flat * smoothstep(_RockLevel - bw, _RockLevel + bw, heightN);
-
-                // Vegetation: flat + below snow line
-                float wVeg = flat * (1.0 - smoothstep(_RockLevel - bw, _RockLevel + bw, heightN));
+                // Rock covers steep terrain, rocky coasts, and high barren ground.
+                float wRock = wRockyShore + aboveShore * steepRock + wHighBare;
 
                 // Split vegetation by moisture: grass vs dry/savanna
                 float wGrass = wVeg * moisture;

@@ -61,6 +61,13 @@ namespace Lib.TerrainGen
             _shader.SetFloat ("WarpStrength",   s.warpStrength);
             _shader.SetFloat ("RidgeWeight",    s.ridgeWeight);
             _shader.SetFloat ("ContinentBias",  s.continentBias);
+            _shader.SetFloat ("SeaLevel",       s.seaLevel);
+            _shader.SetFloat ("CoastBlend",     s.coastBlend);
+            _shader.SetFloat ("MountainStart",  s.mountainStart);
+            _shader.SetFloat ("MountainBlend",  s.mountainBlend);
+            _shader.SetFloat ("OceanDepth",     s.oceanDepth);
+            _shader.SetFloat ("PlainsHeight",   s.plainsHeight);
+            _shader.SetFloat ("MountainHeight", s.mountainHeight);
 
             int groups = Mathf.CeilToInt(s.chunkSize / 8f);
             _shader.Dispatch(_kernel, groups, groups, 1);
