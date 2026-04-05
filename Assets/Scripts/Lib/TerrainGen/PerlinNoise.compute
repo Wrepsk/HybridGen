@@ -168,15 +168,23 @@ void GenerateHeightmap(uint3 id : SV_DispatchThreadID)
 
     // 4. Ridged noise shapes mountain ranges.
     float ridgedMountainNoise = RidgedNoise(worldX * 1.1, worldY * 1.1);
+    float ridgedDetailNoise = RidgedNoise(worldX * 2.5 + 17.3, worldY * 2.5 + 41.9);
     float ridgeShape = lerp(ridgedMountainNoise,
                             ridgedMountainNoise * ridgedMountainNoise,
                             RidgeWeight);
+    float mountainStructure = saturate(ridgeShape * 0.55
+                                     + ridgedDetailNoise * 0.45
+                                     - baseTerrain * 0.10);
 
     // 5. Large-scale region noise breaks up uniform mountain belts.
     float mountainRegion01 = saturate(ContinentNoise(cx * 1.8 + 13.7,
                                                      cy * 1.8 + 27.9) * 0.5 + 0.5);
     float mountainRegionMask = smoothstep(0.34, 0.68, mountainRegion01);
     float mountainRegionStrength = smoothstep(0.24, 0.80, mountainRegion01);
+    float mountainHeightRegion01 = saturate(ContinentNoise(cx * 2.9 - 41.3,
+                                                           cy * 2.9 + 8.7) * 0.5 + 0.5);
+    float mountainHeightScale = lerp(0.75, 1.45,
+                                     smoothstep(0.35, 0.88, mountainHeightRegion01));
 
     // 6. Mountains only emerge on select high continental areas.
     float mountainThreshold = MountainStart;
@@ -188,6 +196,12 @@ void GenerateHeightmap(uint3 id : SV_DispatchThreadID)
                        * continentalMountainSuitability
                        * lerp(0.35, 1.0, mountainRegionMask);
     mountainMask = pow(mountainMask, 1.15);
+    float foothillEnvelope = landMask
+                           * smoothstep(mountainThreshold - mountainWidth * 1.35,
+                                        mountainThreshold + mountainWidth * 0.35,
+                                        continentLand01)
+                           * lerp(0.25, 0.9, mountainRegionMask);
+    float foothillMask = saturate(foothillEnvelope - mountainMask * 0.65);
 
     float inland01 = saturate((continentLand01 - SeaLevel) / max(1e-4, 1.0 - SeaLevel));
     float inlandProtection = smoothstep(0.18, 0.45, inland01);
@@ -198,34 +212,52 @@ void GenerateHeightmap(uint3 id : SV_DispatchThreadID)
 
     // 7. Plains keep broad lowlands, but with more rolling variation.
     float plainsHeight = SeaLevel + PlainsHeight * (0.16 + 0.18 * inland01 * inland01);
-    plainsHeight += baseTerrain * PlainsHeight * 0.36;
+    plainsHeight += baseTerrain * PlainsHeight * 0.42;
 
-    // 8. Mountain regions vary in strength instead of rising uniformly.
-    float regionalMountainStrength = lerp(0.70, 1.25, mountainRegionStrength);
-    float regionalMountainHeight = MountainHeight
-                                 * regionalMountainStrength
-                                 * (0.22 + 0.82 * ridgeShape);
+    // 8. Foothills create a buildup before the full mountain core.
+    float foothillStructure = saturate(0.35
+                                     + 0.35 * mountainStructure
+                                     + 0.30 * ((baseTerrain + 1.0) * 0.5));
+    float foothillHeight = plainsHeight
+                         + PlainsHeight
+                         * lerp(0.40, 0.90, mountainRegionStrength)
+                         * foothillStructure;
 
-    // 9. Rare peaks add occasional standout summits inside mountain regions.
+    // 9. Mountain regions vary in strength and internal ridge detail.
+    float regionalMountainStrength = lerp(0.65, 1.30, mountainRegionStrength)
+                                   * mountainHeightScale;
+    float mountainBaseHeight = foothillHeight
+                             + MountainHeight
+                             * regionalMountainStrength
+                             * (0.18 + 0.95 * mountainStructure);
+
+    // 10. Rare peaks add occasional standout summits inside mountain regions.
     float peakNoise01 = saturate(OctaveNoise(worldX * 2.6 + 71.3,
                                              worldY * 2.6 + 19.7) * 0.5 + 0.5);
-    float rarePeakMask = mountainRegionMask
-                       * smoothstep(0.90, 0.97, peakNoise01)
-                       * smoothstep(0.58, 0.90, ridgeShape);
+    float rarePeakMask = mountainMask
+                       * smoothstep(0.95, 0.992, peakNoise01)
+                       * smoothstep(0.72, 0.95, ridgedDetailNoise);
+    float peakHeightValue = mountainBaseHeight
+                          + MountainHeight * 1.10 * mountainHeightScale * rarePeakMask;
 
-    // 10. Mountains add regional height plus sparse peaks on top of plains.
-    float mountainHeightValue = plainsHeight
-                              + regionalMountainHeight
-                              + MountainHeight * 0.55 * rarePeakMask;
-
-    // 11. Land blends plains into mountains.
-    float landHeight = lerp(plainsHeight, mountainHeightValue, mountainMask);
+    // 11. Blend plains into foothills, then mountains, then rare peaks.
+    float landHeight = lerp(plainsHeight, foothillHeight, foothillMask);
+    landHeight = lerp(landHeight, mountainBaseHeight, mountainMask);
+    landHeight = lerp(landHeight, peakHeightValue, rarePeakMask);
 
     // 12. Final terrain blends ocean and land, then clamps to [0, 1].
     float rawHeight = lerp(oceanHeight, landHeight, landMask);
 
     // Prevent inland terrain from falling below sea level.
     rawHeight = lerp(rawHeight, max(rawHeight, SeaLevel + 0.005), inlandProtection);
+
+    // Soft-cap the tallest terrain so peaks taper instead of flattening at 1.0.
+    float softPeakStart = 0.88;
+    float softPeakRange = 1.0 - softPeakStart;
+    float peakOverflow = max(0.0, rawHeight - softPeakStart);
+    rawHeight = min(rawHeight, softPeakStart)
+              + peakOverflow * softPeakRange / (peakOverflow + softPeakRange);
+
     float height = saturate(rawHeight);
 
     HeightmapOutput[id.xy] = height;

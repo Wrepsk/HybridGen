@@ -565,7 +565,7 @@ MonoBehaviour:
     continentScale: 8
     continentBias: -0.05
     warpStrength: 5
-    ridgeWeight: 0.2
+    ridgeWeight: 0.22
     mountainStart: 0.62
     mountainBlend: 0.2
     mountainHeight: 0.4
