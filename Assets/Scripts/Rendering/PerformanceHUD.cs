@@ -34,7 +34,7 @@ namespace Rendering
             ChunkMetrics m = chunkManager.Metrics;
 
             float w = 330f;
-            float h = 240f;
+            float h = 400f;
             Rect box = new Rect(10, 10, w, h);
             GUI.Box(box, GUIContent.none, _boxStyle);
 
@@ -58,6 +58,17 @@ namespace Rendering
 
             Line(ref y, x, w, lineH, $"Allocated:        {m.AllocatedMemoryMB:F1} MB");
             Line(ref y, x, w, lineH, $"GPU Textures:     {m.GpuTextureMB:F2} MB");
+
+            y += 4f;
+            GUI.Label(new Rect(x, y, w, lineH), "Analysis", _headerStyle);
+            y += lineH + 4f;
+
+            Line(ref y, x, w, lineH, $"Total Analyzed:   {m.TotalAnalyzed}");
+            Line(ref y, x, w, lineH, $"Last Analyze:     {m.LastAnalysisTimeMs:F2} ms");
+            Line(ref y, x, w, lineH, $"Avg Analyze:      {m.AvgAnalysisTimeMs:F2} ms");
+            Line(ref y, x, w, lineH, $"Min / Max:        {m.MinAnalysisTimeMs:F2} / {m.MaxAnalysisTimeMs:F2} ms");
+            Line(ref y, x, w, lineH, $"Buildable Cells:  {m.VisibleBuildableCells}");
+            Line(ref y, x, w, lineH, $"Buildable Ratio:  {m.VisibleBuildableRatio:P1}");
         }
 
         void Line(ref float y, float x, float w, float h, string text)

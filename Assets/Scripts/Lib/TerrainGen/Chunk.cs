@@ -1,3 +1,4 @@
+using Lib.TerrainAnalysis;
 using UnityEngine;
 
 namespace Lib.TerrainGen
@@ -13,6 +14,8 @@ namespace Lib.TerrainGen
         public RenderTexture GpuTexture      { get; set; }
 
         public RenderTexture MoistureTexture { get; set; }
+
+        public TerrainChunkAnalysis Analysis { get; set; }
 
         public float RequestTime { get; set; }
 

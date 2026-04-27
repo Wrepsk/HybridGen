@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using Lib.TerrainAnalysis;
 using Lib.TerrainGen;
 using UnityEngine;
 using UnityEngine.Profiling;
@@ -13,8 +15,15 @@ namespace Rendering
         public float AvgGenTimeMs;
         public float MinGenTimeMs;
         public float MaxGenTimeMs;
+        public int   TotalAnalyzed;
+        public float LastAnalysisTimeMs;
+        public float AvgAnalysisTimeMs;
+        public float MinAnalysisTimeMs;
+        public float MaxAnalysisTimeMs;
         public float AllocatedMemoryMB;
         public float GpuTextureMB;
+        public int   VisibleBuildableCells;
+        public float VisibleBuildableRatio;
     }
 
     public class ChunkManager : MonoBehaviour
@@ -30,27 +39,38 @@ namespace Rendering
         [Header("Settings")]
         [SerializeField] NoiseSettings noiseSettings = new();
         [SerializeField] int           viewDistance   = 3;
+        [SerializeField] TerrainAnalysisSettings terrainAnalysisSettings = new();
 
         [Header("Fog")]
         [SerializeField] Color fogColor = new Color(0.65f, 0.77f, 0.90f);
 
         Lib.TerrainGen.NoiseGenerator _noiseGen;
+        TerrainAnalyzer _terrainAnalyzer;
         HeightmapReadback _readback;
         MeshGenerator _meshGen;
 
         readonly Dictionary<Vector2Int, Chunk>     _chunks  = new();
         readonly Dictionary<Vector2Int, ChunkView> _views   = new();
+        readonly Dictionary<Vector2Int, TerrainAnalysisOverlayView> _analysisOverlays = new();
         readonly HashSet<Vector2Int>               _pending = new();
         readonly List<Vector2Int> _removeBuffer = new();
 
         Transform  _viewer;
         GameObject _waterPlane;
+        Material   _analysisOverlayMaterial;
 
         int   _genCount;
         float _lastGenTime;
         float _minGenTime = float.MaxValue;
         float _maxGenTime;
         float _genTimeSum;
+        int   _analysisCount;
+        float _lastAnalysisTime;
+        float _minAnalysisTime = float.MaxValue;
+        float _maxAnalysisTime;
+        float _analysisTimeSum;
+
+        public event Action<TerrainChunkAnalysis> ChunkAnalyzed;
 
         public ChunkMetrics Metrics
         {
@@ -58,6 +78,17 @@ namespace Rendering
             {
                 int chunkSize = noiseSettings.chunkSize;
                 float gpuBytes = _chunks.Count * chunkSize * chunkSize * 4f;
+                int visibleBuildableCells = 0;
+                int visibleAnalyzedCells = 0;
+
+                foreach (Chunk chunk in _chunks.Values)
+                {
+                    if (chunk.Analysis == null)
+                        continue;
+
+                    visibleBuildableCells += chunk.Analysis.BuildableCount;
+                    visibleAnalyzedCells += chunk.Analysis.TotalCellCount;
+                }
 
                 return new ChunkMetrics
                 {
@@ -67,8 +98,17 @@ namespace Rendering
                     AvgGenTimeMs    = _genCount > 0 ? _genTimeSum / _genCount : 0f,
                     MinGenTimeMs    = _genCount > 0 ? _minGenTime : 0f,
                     MaxGenTimeMs    = _maxGenTime,
+                    TotalAnalyzed   = _analysisCount,
+                    LastAnalysisTimeMs = _lastAnalysisTime,
+                    AvgAnalysisTimeMs = _analysisCount > 0 ? _analysisTimeSum / _analysisCount : 0f,
+                    MinAnalysisTimeMs = _analysisCount > 0 ? _minAnalysisTime : 0f,
+                    MaxAnalysisTimeMs = _maxAnalysisTime,
                     AllocatedMemoryMB = Profiler.GetTotalAllocatedMemoryLong() / (1024f * 1024f),
-                    GpuTextureMB      = gpuBytes / (1024f * 1024f)
+                    GpuTextureMB      = gpuBytes / (1024f * 1024f),
+                    VisibleBuildableCells = visibleBuildableCells,
+                    VisibleBuildableRatio = visibleAnalyzedCells > 0
+                        ? visibleBuildableCells / (float)visibleAnalyzedCells
+                        : 0f
                 };
             }
         }
@@ -76,9 +116,11 @@ namespace Rendering
         void Awake()
         {
             _noiseGen = new Lib.TerrainGen.NoiseGenerator(noiseShader);
+            _terrainAnalyzer = new TerrainAnalyzer();
             _readback = new HeightmapReadback();
             _meshGen  = new MeshGenerator(heightMultiplier, heightCurve);
             _viewer   = Camera.main.transform;
+            _analysisOverlayMaterial = CreateAnalysisOverlayMaterial();
 
             SyncTerrainMaterialSettings();
             SetupFog();
@@ -147,6 +189,7 @@ namespace Rendering
             Vector2Int viewerChunk = WorldToChunkCoord(_viewer.position);
             RequestVisibleChunks(viewerChunk);
             UnloadDistantChunks(viewerChunk);
+            UpdateAnalysisOverlayVisibility(viewerChunk);
 
             if (_waterPlane != null)
             {
@@ -185,12 +228,19 @@ namespace Rendering
                 chunk.ReleaseMoistureTexture();
                 chunk.ReleaseGpuTexture();
                 chunk.Heightmap = null;
+                chunk.Analysis = null;
                 _chunks.Remove(coord);
 
                 if (_views.TryGetValue(coord, out var view))
                 {
                     view.Destroy();
                     _views.Remove(coord);
+                }
+
+                if (_analysisOverlays.TryGetValue(coord, out var overlay))
+                {
+                    overlay.Destroy();
+                    _analysisOverlays.Remove(coord);
                 }
             }
         }
@@ -228,7 +278,10 @@ namespace Rendering
 
             _chunks[chunk.Coord] = chunk;
             if (chunk.State == ChunkState.Ready)
+            {
+                AnalyzeChunk(chunk);
                 SpawnChunkView(chunk);
+            }
         }
 
         void SpawnChunkView(Chunk chunk)
@@ -240,12 +293,96 @@ namespace Rendering
             _views[chunk.Coord] = view;
         }
 
+        void AnalyzeChunk(Chunk chunk)
+        {
+            chunk.Analysis = null;
+
+            if (_analysisOverlays.TryGetValue(chunk.Coord, out var existingOverlay))
+            {
+                existingOverlay.Destroy();
+                _analysisOverlays.Remove(chunk.Coord);
+            }
+
+            if (!terrainAnalysisSettings.enabled)
+                return;
+
+            float startedAt = Time.realtimeSinceStartup;
+            TerrainChunkAnalysis analysis = _terrainAnalyzer.Analyze(
+                chunk.Coord,
+                chunk.Heightmap,
+                noiseSettings,
+                terrainAnalysisSettings,
+                heightMultiplier,
+                heightCurve);
+
+            if (analysis == null)
+                return;
+
+            float elapsed = (Time.realtimeSinceStartup - startedAt) * 1000f;
+            _lastAnalysisTime = elapsed;
+            _analysisTimeSum += elapsed;
+            _analysisCount++;
+            if (elapsed < _minAnalysisTime) _minAnalysisTime = elapsed;
+            if (elapsed > _maxAnalysisTime) _maxAnalysisTime = elapsed;
+
+            chunk.Analysis = analysis;
+            ChunkAnalyzed?.Invoke(analysis);
+
+            if (_analysisOverlayMaterial != null)
+            {
+                _analysisOverlays[chunk.Coord] = new TerrainAnalysisOverlayView(
+                    analysis,
+                    _analysisOverlayMaterial,
+                    transform);
+            }
+        }
+
+        void UpdateAnalysisOverlayVisibility(Vector2Int viewerChunk)
+        {
+            bool showOverlays = terrainAnalysisSettings.enabled
+                             && terrainAnalysisSettings.debugOverlayEnabled;
+            int overlayRadius = Mathf.Max(0, terrainAnalysisSettings.debugOverlayChunkRadius);
+
+            foreach (var pair in _analysisOverlays)
+            {
+                Vector2Int coord = pair.Key;
+                bool isVisible = showOverlays
+                              && Mathf.Abs(coord.x - viewerChunk.x) <= overlayRadius
+                              && Mathf.Abs(coord.y - viewerChunk.y) <= overlayRadius;
+                pair.Value.SetVisible(isVisible);
+            }
+        }
+
+        Material CreateAnalysisOverlayMaterial()
+        {
+            var shader = Shader.Find("Hidden/HybridGen/TerrainAnalysisOverlay");
+            if (shader == null)
+            {
+                Debug.LogWarning("[ChunkManager] Terrain analysis overlay shader was not found. Overlay rendering is disabled.");
+                return null;
+            }
+
+            return new Material(shader);
+        }
+
         Vector2Int WorldToChunkCoord(Vector3 worldPos)
         {
             int size = noiseSettings.chunkSize - 1;
             return new Vector2Int(
                 Mathf.FloorToInt(worldPos.x / size),
                 Mathf.FloorToInt(worldPos.z / size));
+        }
+
+        public bool TryGetChunkAnalysis(Vector2Int chunkCoord, out TerrainChunkAnalysis analysis)
+        {
+            if (_chunks.TryGetValue(chunkCoord, out var chunk) && chunk.Analysis != null)
+            {
+                analysis = chunk.Analysis;
+                return true;
+            }
+
+            analysis = null;
+            return false;
         }
 
         [ContextMenu("Regenerate Terrain")]
@@ -256,9 +393,12 @@ namespace Rendering
                 chunk.ReleaseMoistureTexture();
                 chunk.ReleaseGpuTexture();
                 chunk.Heightmap = null;
+                chunk.Analysis = null;
             }
             foreach (var view in _views.Values)
                 view.Destroy();
+            foreach (var overlay in _analysisOverlays.Values)
+                overlay.Destroy();
 
             _meshGen  = new MeshGenerator(heightMultiplier, heightCurve);
             _noiseGen = new Lib.TerrainGen.NoiseGenerator(noiseShader);
@@ -267,6 +407,7 @@ namespace Rendering
 
             _chunks.Clear();
             _views.Clear();
+            _analysisOverlays.Clear();
             _pending.Clear();
 
             _genCount    = 0;
@@ -274,6 +415,11 @@ namespace Rendering
             _lastGenTime = 0f;
             _minGenTime  = float.MaxValue;
             _maxGenTime  = 0f;
+            _analysisCount = 0;
+            _analysisTimeSum = 0f;
+            _lastAnalysisTime = 0f;
+            _minAnalysisTime = float.MaxValue;
+            _maxAnalysisTime = 0f;
 
             SetupFog();
 
@@ -282,6 +428,17 @@ namespace Rendering
                 Vector2Int viewerChunk = WorldToChunkCoord(_viewer.position);
                 RequestVisibleChunks(viewerChunk);
             }
+        }
+
+        void OnDestroy()
+        {
+            foreach (var overlay in _analysisOverlays.Values)
+                overlay.Destroy();
+
+            _analysisOverlays.Clear();
+
+            if (_analysisOverlayMaterial != null)
+                Destroy(_analysisOverlayMaterial);
         }
     }
 }

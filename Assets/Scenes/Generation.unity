@@ -574,6 +574,14 @@ MonoBehaviour:
     oceanDepth: 0.28
     plainsHeight: 0.16
   viewDistance: 16
+  terrainAnalysisSettings:
+    enabled: 1
+    cellsPerAxis: 16
+    maxSlopeDegrees: 12
+    maxRoughnessWorld: 1.25
+    waterClearanceWorld: 0.5
+    debugOverlayEnabled: 1
+    debugOverlayChunkRadius: 2
   fogColor: {r: 0.65, g: 0.77, b: 0.9, a: 1}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
