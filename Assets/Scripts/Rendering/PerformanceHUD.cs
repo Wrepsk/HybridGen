@@ -34,7 +34,7 @@ namespace Rendering
             ChunkMetrics m = chunkManager.Metrics;
 
             float w = 330f;
-            float h = 400f;
+            float h = 560f;
             Rect box = new Rect(10, 10, w, h);
             GUI.Box(box, GUIContent.none, _boxStyle);
 
@@ -69,6 +69,17 @@ namespace Rendering
             Line(ref y, x, w, lineH, $"Min / Max:        {m.MinAnalysisTimeMs:F2} / {m.MaxAnalysisTimeMs:F2} ms");
             Line(ref y, x, w, lineH, $"Buildable Cells:  {m.VisibleBuildableCells}");
             Line(ref y, x, w, lineH, $"Buildable Ratio:  {m.VisibleBuildableRatio:P1}");
+
+            y += 4f;
+            GUI.Label(new Rect(x, y, w, lineH), "WFC Buildings", _headerStyle);
+            y += lineH + 4f;
+
+            Line(ref y, x, w, lineH, $"Building Chunks:  {m.ActiveBuildingChunks}");
+            Line(ref y, x, w, lineH, $"Blueprints:       {m.ActiveBuildingBlueprints}");
+            Line(ref y, x, w, lineH, $"Attempts:         {m.TotalWfcAttempts}");
+            Line(ref y, x, w, lineH, $"Success / Fail:   {m.TotalWfcSucceeded} / {m.TotalWfcFailed}");
+            Line(ref y, x, w, lineH, $"Last WFC:         {m.LastWfcTimeMs:F2} ms");
+            Line(ref y, x, w, lineH, $"Avg WFC:          {m.AvgWfcTimeMs:F2} ms");
         }
 
         void Line(ref float y, float x, float w, float h, string text)

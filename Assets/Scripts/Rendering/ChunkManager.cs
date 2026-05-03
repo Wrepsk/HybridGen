@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Lib.TerrainAnalysis;
 using Lib.TerrainGen;
+using Lib.WFC;
 using UnityEngine;
 using UnityEngine.Profiling;
 
@@ -24,6 +25,15 @@ namespace Rendering
         public float GpuTextureMB;
         public int   VisibleBuildableCells;
         public float VisibleBuildableRatio;
+        public int   ActiveBuildingChunks;
+        public int   ActiveBuildingBlueprints;
+        public int   TotalWfcAttempts;
+        public int   TotalWfcSucceeded;
+        public int   TotalWfcFailed;
+        public float LastWfcTimeMs;
+        public float AvgWfcTimeMs;
+        public float MinWfcTimeMs;
+        public float MaxWfcTimeMs;
     }
 
     public class ChunkManager : MonoBehaviour
@@ -40,18 +50,22 @@ namespace Rendering
         [SerializeField] NoiseSettings noiseSettings = new();
         [SerializeField] int           viewDistance   = 3;
         [SerializeField] TerrainAnalysisSettings terrainAnalysisSettings = new();
+        [SerializeField] WFCSettings wfcSettings = new();
 
         [Header("Fog")]
         [SerializeField] Color fogColor = new Color(0.65f, 0.77f, 0.90f);
 
         Lib.TerrainGen.NoiseGenerator _noiseGen;
         TerrainAnalyzer _terrainAnalyzer;
+        WFCGenerator _wfcGenerator;
         HeightmapReadback _readback;
         MeshGenerator _meshGen;
+        BuildingSpawner _buildingSpawner;
 
         readonly Dictionary<Vector2Int, Chunk>     _chunks  = new();
         readonly Dictionary<Vector2Int, ChunkView> _views   = new();
         readonly Dictionary<Vector2Int, TerrainAnalysisOverlayView> _analysisOverlays = new();
+        readonly Dictionary<Vector2Int, BuildingView> _buildingViews = new();
         readonly HashSet<Vector2Int>               _pending = new();
         readonly List<Vector2Int> _removeBuffer = new();
 
@@ -69,8 +83,17 @@ namespace Rendering
         float _minAnalysisTime = float.MaxValue;
         float _maxAnalysisTime;
         float _analysisTimeSum;
+        int   _wfcAttemptCount;
+        int   _wfcSuccessCount;
+        int   _wfcFailureCount;
+        int   _wfcGenerationCount;
+        float _lastWfcTime;
+        float _minWfcTime = float.MaxValue;
+        float _maxWfcTime;
+        float _wfcTimeSum;
 
         public event Action<TerrainChunkAnalysis> ChunkAnalyzed;
+        public event Action<WFCChunkGeneration> BuildingsGenerated;
 
         public ChunkMetrics Metrics
         {
@@ -80,14 +103,18 @@ namespace Rendering
                 float gpuBytes = _chunks.Count * chunkSize * chunkSize * 4f;
                 int visibleBuildableCells = 0;
                 int visibleAnalyzedCells = 0;
+                int activeBuildingBlueprints = 0;
 
                 foreach (Chunk chunk in _chunks.Values)
                 {
-                    if (chunk.Analysis == null)
-                        continue;
+                    if (chunk.Analysis != null)
+                    {
+                        visibleBuildableCells += chunk.Analysis.BuildableCount;
+                        visibleAnalyzedCells += chunk.Analysis.TotalCellCount;
+                    }
 
-                    visibleBuildableCells += chunk.Analysis.BuildableCount;
-                    visibleAnalyzedCells += chunk.Analysis.TotalCellCount;
+                    if (chunk.BuildingBlueprints != null)
+                        activeBuildingBlueprints += chunk.BuildingBlueprints.Length;
                 }
 
                 return new ChunkMetrics
@@ -108,7 +135,16 @@ namespace Rendering
                     VisibleBuildableCells = visibleBuildableCells,
                     VisibleBuildableRatio = visibleAnalyzedCells > 0
                         ? visibleBuildableCells / (float)visibleAnalyzedCells
-                        : 0f
+                        : 0f,
+                    ActiveBuildingChunks = _buildingViews.Count,
+                    ActiveBuildingBlueprints = activeBuildingBlueprints,
+                    TotalWfcAttempts = _wfcAttemptCount,
+                    TotalWfcSucceeded = _wfcSuccessCount,
+                    TotalWfcFailed = _wfcFailureCount,
+                    LastWfcTimeMs = _lastWfcTime,
+                    AvgWfcTimeMs = _wfcGenerationCount > 0 ? _wfcTimeSum / _wfcGenerationCount : 0f,
+                    MinWfcTimeMs = _wfcGenerationCount > 0 ? _minWfcTime : 0f,
+                    MaxWfcTimeMs = _maxWfcTime
                 };
             }
         }
@@ -117,8 +153,10 @@ namespace Rendering
         {
             _noiseGen = new Lib.TerrainGen.NoiseGenerator(noiseShader);
             _terrainAnalyzer = new TerrainAnalyzer();
+            _wfcGenerator = new WFCGenerator();
             _readback = new HeightmapReadback();
             _meshGen  = new MeshGenerator(heightMultiplier, heightCurve);
+            _buildingSpawner = new BuildingSpawner();
             _viewer   = Camera.main.transform;
             _analysisOverlayMaterial = CreateAnalysisOverlayMaterial();
 
@@ -190,6 +228,7 @@ namespace Rendering
             RequestVisibleChunks(viewerChunk);
             UnloadDistantChunks(viewerChunk);
             UpdateAnalysisOverlayVisibility(viewerChunk);
+            GenerateBuildingsNear(viewerChunk);
 
             if (_waterPlane != null)
             {
@@ -229,6 +268,8 @@ namespace Rendering
                 chunk.ReleaseGpuTexture();
                 chunk.Heightmap = null;
                 chunk.Analysis = null;
+                chunk.BuildingBlueprints = null;
+                chunk.BuildingGenerationAttempted = false;
                 _chunks.Remove(coord);
 
                 if (_views.TryGetValue(coord, out var view))
@@ -241,6 +282,12 @@ namespace Rendering
                 {
                     overlay.Destroy();
                     _analysisOverlays.Remove(coord);
+                }
+
+                if (_buildingViews.TryGetValue(coord, out var buildingView))
+                {
+                    buildingView.Destroy();
+                    _buildingViews.Remove(coord);
                 }
             }
         }
@@ -280,6 +327,7 @@ namespace Rendering
             if (chunk.State == ChunkState.Ready)
             {
                 AnalyzeChunk(chunk);
+                TryGenerateBuildingsForChunk(chunk, viewerChunk);
                 SpawnChunkView(chunk);
             }
         }
@@ -333,6 +381,71 @@ namespace Rendering
                 _analysisOverlays[chunk.Coord] = new TerrainAnalysisOverlayView(
                     analysis,
                     _analysisOverlayMaterial,
+                    transform);
+            }
+        }
+
+        void GenerateBuildingsNear(Vector2Int viewerChunk)
+        {
+            if (wfcSettings == null || !wfcSettings.enabled)
+                return;
+
+            int radius = Mathf.Max(0, wfcSettings.buildingChunkRadius);
+            for (int x = -radius; x <= radius; x++)
+            {
+                for (int y = -radius; y <= radius; y++)
+                {
+                    var coord = new Vector2Int(viewerChunk.x + x, viewerChunk.y + y);
+                    if (_chunks.TryGetValue(coord, out var chunk))
+                        TryGenerateBuildingsForChunk(chunk, viewerChunk);
+                }
+            }
+        }
+
+        void TryGenerateBuildingsForChunk(Chunk chunk, Vector2Int viewerChunk)
+        {
+            if (wfcSettings == null
+                || !wfcSettings.enabled
+                || chunk == null
+                || chunk.Analysis == null
+                || chunk.BuildingGenerationAttempted)
+                return;
+
+            int radius = Mathf.Max(0, wfcSettings.buildingChunkRadius);
+            if (Mathf.Abs(chunk.Coord.x - viewerChunk.x) > radius
+                || Mathf.Abs(chunk.Coord.y - viewerChunk.y) > radius)
+                return;
+
+            chunk.BuildingGenerationAttempted = true;
+
+            if (_buildingViews.TryGetValue(chunk.Coord, out var existingView))
+            {
+                existingView.Destroy();
+                _buildingViews.Remove(chunk.Coord);
+            }
+
+            float startedAt = Time.realtimeSinceStartup;
+            WFCChunkGeneration generation = _wfcGenerator.Generate(chunk.Analysis, wfcSettings, noiseSettings.seed);
+            float elapsed = (Time.realtimeSinceStartup - startedAt) * 1000f;
+
+            _lastWfcTime = elapsed;
+            _wfcTimeSum += elapsed;
+            _wfcGenerationCount++;
+            _wfcAttemptCount += generation.AttemptCount;
+            _wfcSuccessCount += generation.SuccessCount;
+            _wfcFailureCount += generation.FailureCount;
+            if (elapsed < _minWfcTime) _minWfcTime = elapsed;
+            if (elapsed > _maxWfcTime) _maxWfcTime = elapsed;
+
+            chunk.BuildingBlueprints = generation.Blueprints;
+            BuildingsGenerated?.Invoke(generation);
+
+            if (generation.SuccessCount > 0)
+            {
+                _buildingViews[chunk.Coord] = _buildingSpawner.SpawnChunkBuildings(
+                    chunk.Coord,
+                    generation.Blueprints,
+                    wfcSettings,
                     transform);
             }
         }
@@ -394,11 +507,15 @@ namespace Rendering
                 chunk.ReleaseGpuTexture();
                 chunk.Heightmap = null;
                 chunk.Analysis = null;
+                chunk.BuildingBlueprints = null;
+                chunk.BuildingGenerationAttempted = false;
             }
             foreach (var view in _views.Values)
                 view.Destroy();
             foreach (var overlay in _analysisOverlays.Values)
                 overlay.Destroy();
+            foreach (var buildingView in _buildingViews.Values)
+                buildingView.Destroy();
 
             _meshGen  = new MeshGenerator(heightMultiplier, heightCurve);
             _noiseGen = new Lib.TerrainGen.NoiseGenerator(noiseShader);
@@ -408,6 +525,7 @@ namespace Rendering
             _chunks.Clear();
             _views.Clear();
             _analysisOverlays.Clear();
+            _buildingViews.Clear();
             _pending.Clear();
 
             _genCount    = 0;
@@ -420,6 +538,14 @@ namespace Rendering
             _lastAnalysisTime = 0f;
             _minAnalysisTime = float.MaxValue;
             _maxAnalysisTime = 0f;
+            _wfcAttemptCount = 0;
+            _wfcSuccessCount = 0;
+            _wfcFailureCount = 0;
+            _wfcGenerationCount = 0;
+            _wfcTimeSum = 0f;
+            _lastWfcTime = 0f;
+            _minWfcTime = float.MaxValue;
+            _maxWfcTime = 0f;
 
             SetupFog();
 
@@ -434,11 +560,15 @@ namespace Rendering
         {
             foreach (var overlay in _analysisOverlays.Values)
                 overlay.Destroy();
+            foreach (var buildingView in _buildingViews.Values)
+                buildingView.Destroy();
 
             _analysisOverlays.Clear();
+            _buildingViews.Clear();
 
             if (_analysisOverlayMaterial != null)
                 Destroy(_analysisOverlayMaterial);
+            _buildingSpawner?.DestroyMaterials();
         }
     }
 }

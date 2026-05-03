@@ -580,8 +580,23 @@ MonoBehaviour:
     maxSlopeDegrees: 12
     maxRoughnessWorld: 1.25
     waterClearanceWorld: 0.5
-    debugOverlayEnabled: 1
+    debugOverlayEnabled: 0
     debugOverlayChunkRadius: 2
+  wfcSettings:
+    enabled: 1
+    buildingChunkRadius: 16
+    maxBuildingsPerChunk: 1
+    minFootprintCells: 3
+    maxFootprintCells: 5
+    minCellScore: 0.25
+    plotPaddingCells: 1
+    maxSolverRetries: 8
+    seedOffset: 918273
+    moduleScale: 0.82
+    floorThickness: 0.25
+    wallHeight: 3
+    roofThickness: 0.35
+    roofOverhang: 0.35
   fogColor: {r: 0.65, g: 0.77, b: 0.9, a: 1}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

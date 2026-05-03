@@ -1,4 +1,5 @@
 using Lib.TerrainAnalysis;
+using Lib.WFC;
 using UnityEngine;
 
 namespace Lib.TerrainGen
@@ -16,6 +17,10 @@ namespace Lib.TerrainGen
         public RenderTexture MoistureTexture { get; set; }
 
         public TerrainChunkAnalysis Analysis { get; set; }
+
+        public BuildingBlueprint[] BuildingBlueprints { get; set; }
+
+        public bool BuildingGenerationAttempted { get; set; }
 
         public float RequestTime { get; set; }
 
