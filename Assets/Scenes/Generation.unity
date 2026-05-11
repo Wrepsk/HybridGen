@@ -122,6 +122,64 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &216348357
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 216348358}
+  - component: {fileID: 216348359}
+  m_Layer: 0
+  m_Name: Benchmark
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &216348358
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 216348357}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &216348359
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 216348357}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2150dcb8b7434e24986ce2fc485cc4a0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  chunkManager: {fileID: 1628499866}
+  cameraTransform: {fileID: 330585546}
+  cameraControllerToDisable: {fileID: 330585548}
+  runOnStart: 1
+  regenerateBeforeRun: 1
+  warmupSeconds: 5
+  durationSeconds: 60
+  moveSpeed: 35
+  worldDirection: {x: 0, y: 0, z: 1}
+  sampleIntervalSeconds: 0.5
+  runLabel: baseline_c_3
+  writeToProjectRoot: 1
+  outputFolderName: BenchmarkResults
+  pauseEditorOnComplete: 0
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
@@ -211,7 +269,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 50, z: -10}
+  m_LocalPosition: {x: 0, y: 80, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -556,7 +614,7 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   noiseSettings:
-    seed: 0
+    seed: 303
     chunkSize: 128
     scale: 100
     octaves: 6
@@ -573,7 +631,7 @@ MonoBehaviour:
     coastBlend: 0.05
     oceanDepth: 0.28
     plainsHeight: 0.16
-  viewDistance: 16
+  viewDistance: 10
   terrainAnalysisSettings:
     enabled: 1
     cellsPerAxis: 16
@@ -584,7 +642,7 @@ MonoBehaviour:
     debugOverlayChunkRadius: 2
   wfcSettings:
     enabled: 1
-    buildingChunkRadius: 16
+    buildingChunkRadius: 10
     maxBuildingsPerChunk: 1
     minFootprintCells: 3
     maxFootprintCells: 5
@@ -606,3 +664,4 @@ SceneRoots:
   - {fileID: 410087041}
   - {fileID: 832575519}
   - {fileID: 1628499865}
+  - {fileID: 216348358}

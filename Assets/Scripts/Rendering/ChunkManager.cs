@@ -95,6 +95,11 @@ namespace Rendering
         public event Action<TerrainChunkAnalysis> ChunkAnalyzed;
         public event Action<WFCChunkGeneration> BuildingsGenerated;
 
+        public NoiseSettings NoiseSettings => noiseSettings;
+        public TerrainAnalysisSettings TerrainAnalysisSettings => terrainAnalysisSettings;
+        public WFCSettings WfcSettings => wfcSettings;
+        public int ViewDistance => viewDistance;
+
         public ChunkMetrics Metrics
         {
             get
