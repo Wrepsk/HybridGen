@@ -13,20 +13,20 @@ namespace Lib.WFC
         struct Candidate
         {
             public Vector2Int Origin;
-            public int        Size;
-            public float      AverageScore;
-            public float      SortKey;
+            public int Size;
+            public float AverageScore;
+            public float SortKey;
         }
 
         struct RuntimeSettings
         {
-            public int   MaxBuildingsPerChunk;
-            public int   MinFootprintCells;
-            public int   MaxFootprintCells;
+            public int MaxBuildingsPerChunk;
+            public int MinFootprintCells;
+            public int MaxFootprintCells;
             public float MinCellScore;
-            public int   PlotPaddingCells;
-            public int   MaxSolverRetries;
-            public int   SeedOffset;
+            public int PlotPaddingCells;
+            public int MaxSolverRetries;
+            public int SeedOffset;
         }
 
         public WFCGenerator() : this(WFCModuleLibrary.CreateDefault())

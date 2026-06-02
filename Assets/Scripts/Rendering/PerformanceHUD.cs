@@ -20,7 +20,7 @@ namespace Rendering
             _fpsTimer += Time.unscaledDeltaTime;
             if (_fpsTimer >= 0.5f)
             {
-                _fps       = _fpsFrames / _fpsTimer;
+                _fps = _fpsFrames / _fpsTimer;
                 _fpsFrames = 0;
                 _fpsTimer  = 0f;
             }

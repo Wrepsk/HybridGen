@@ -169,7 +169,7 @@ MonoBehaviour:
   chunkManager: {fileID: 1628499866}
   cameraTransform: {fileID: 330585546}
   cameraControllerToDisable: {fileID: 330585548}
-  runOnStart: 1
+  runOnStart: 0
   regenerateBeforeRun: 1
   warmupSeconds: 5
   durationSeconds: 60
@@ -631,7 +631,7 @@ MonoBehaviour:
     coastBlend: 0.05
     oceanDepth: 0.28
     plainsHeight: 0.16
-  viewDistance: 10
+  viewDistance: 16
   terrainAnalysisSettings:
     enabled: 1
     cellsPerAxis: 16

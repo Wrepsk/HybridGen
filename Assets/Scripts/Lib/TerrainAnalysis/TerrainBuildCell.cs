@@ -4,17 +4,17 @@ namespace Lib.TerrainAnalysis
 {
     public readonly struct TerrainBuildCell
     {
-        public Vector2Int LocalCoord      { get; }
-        public Vector2Int GlobalCoord     { get; }
-        public Vector3    WorldCenter     { get; }
-        public float      AvgHeightWorld  { get; }
-        public float      MinHeightWorld  { get; }
-        public float      MaxHeightWorld  { get; }
-        public float      SlopeDegrees    { get; }
-        public float      Roughness       { get; }
-        public float      Score           { get; }
-        public BuildabilityFlags Flags    { get; }
-        public bool       IsBuildable     { get; }
+        public Vector2Int LocalCoord { get; }
+        public Vector2Int GlobalCoord { get; }
+        public Vector3 WorldCenter { get; }
+        public float AvgHeightWorld { get; }
+        public float MinHeightWorld { get; }
+        public float MaxHeightWorld { get; }
+        public float SlopeDegrees { get; }
+        public float Roughness { get; }
+        public float Score { get; }
+        public BuildabilityFlags Flags { get; }
+        public bool IsBuildable { get; }
 
         public TerrainBuildCell(
             Vector2Int localCoord,

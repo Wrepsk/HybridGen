@@ -2,8 +2,8 @@ namespace Lib.WFC
 {
     public class WFCResult
     {
-        public int         Width   { get; }
-        public int         Height  { get; }
+        public int Width { get; }
+        public int Height { get; }
         public WFCModule[] Modules { get; }
 
         public WFCResult(int width, int height, WFCModule[] modules)

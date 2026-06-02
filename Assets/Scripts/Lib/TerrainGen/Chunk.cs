@@ -8,11 +8,11 @@ namespace Lib.TerrainGen
 
     public class Chunk
     {
-        public Vector2Int    Coord           { get; }
-        public ChunkState    State           { get; set; } = ChunkState.Requested;
-        public float[]       Heightmap       { get; set; }
+        public Vector2Int Coord { get; }
+        public ChunkState State { get; set; } = ChunkState.Requested;
+        public float[] Heightmap { get; set; }
 
-        public RenderTexture GpuTexture      { get; set; }
+        public RenderTexture GpuTexture { get; set; }
 
         public RenderTexture MoistureTexture { get; set; }
 

@@ -10,26 +10,26 @@ namespace Rendering
 {
     public struct ChunkMetrics
     {
-        public int   ActiveChunks;
-        public int   TotalGenerated;
+        public int ActiveChunks;
+        public int TotalGenerated;
         public float LastGenTimeMs;
         public float AvgGenTimeMs;
         public float MinGenTimeMs;
         public float MaxGenTimeMs;
-        public int   TotalAnalyzed;
+        public int TotalAnalyzed;
         public float LastAnalysisTimeMs;
         public float AvgAnalysisTimeMs;
         public float MinAnalysisTimeMs;
         public float MaxAnalysisTimeMs;
         public float AllocatedMemoryMB;
         public float GpuTextureMB;
-        public int   VisibleBuildableCells;
+        public int VisibleBuildableCells;
         public float VisibleBuildableRatio;
-        public int   ActiveBuildingChunks;
-        public int   ActiveBuildingBlueprints;
-        public int   TotalWfcAttempts;
-        public int   TotalWfcSucceeded;
-        public int   TotalWfcFailed;
+        public int ActiveBuildingChunks;
+        public int ActiveBuildingBlueprints;
+        public int TotalWfcAttempts;
+        public int TotalWfcSucceeded;
+        public int TotalWfcFailed;
         public float LastWfcTimeMs;
         public float AvgWfcTimeMs;
         public float MinWfcTimeMs;
@@ -40,15 +40,15 @@ namespace Rendering
     {
         [Header("References")]
         [SerializeField] ComputeShader noiseShader;
-        [SerializeField] Material      terrainMaterial;
+        [SerializeField] Material terrainMaterial;
 
         [Header("Height")]
-        [SerializeField] float          heightMultiplier = 40f;
-        [SerializeField] AnimationCurve heightCurve      = AnimationCurve.Linear(0, 0, 1, 1);
+        [SerializeField] float heightMultiplier = 40f;
+        [SerializeField] AnimationCurve heightCurve = AnimationCurve.Linear(0, 0, 1, 1);
 
         [Header("Settings")]
         [SerializeField] NoiseSettings noiseSettings = new();
-        [SerializeField] int           viewDistance   = 3;
+        [SerializeField] int viewDistance = 3;
         [SerializeField] TerrainAnalysisSettings terrainAnalysisSettings = new();
         [SerializeField] WFCSettings wfcSettings = new();
 
@@ -62,31 +62,31 @@ namespace Rendering
         MeshGenerator _meshGen;
         BuildingSpawner _buildingSpawner;
 
-        readonly Dictionary<Vector2Int, Chunk>     _chunks  = new();
-        readonly Dictionary<Vector2Int, ChunkView> _views   = new();
+        readonly Dictionary<Vector2Int, Chunk> _chunks = new();
+        readonly Dictionary<Vector2Int, ChunkView> _views = new();
         readonly Dictionary<Vector2Int, TerrainAnalysisOverlayView> _analysisOverlays = new();
         readonly Dictionary<Vector2Int, BuildingView> _buildingViews = new();
-        readonly HashSet<Vector2Int>               _pending = new();
+        readonly HashSet<Vector2Int> _pending = new();
         readonly List<Vector2Int> _removeBuffer = new();
 
-        Transform  _viewer;
+        Transform _viewer;
         GameObject _waterPlane;
-        Material   _analysisOverlayMaterial;
+        Material _analysisOverlayMaterial;
 
-        int   _genCount;
+        int _genCount;
         float _lastGenTime;
         float _minGenTime = float.MaxValue;
         float _maxGenTime;
         float _genTimeSum;
-        int   _analysisCount;
+        int _analysisCount;
         float _lastAnalysisTime;
         float _minAnalysisTime = float.MaxValue;
         float _maxAnalysisTime;
         float _analysisTimeSum;
-        int   _wfcAttemptCount;
-        int   _wfcSuccessCount;
-        int   _wfcFailureCount;
-        int   _wfcGenerationCount;
+        int _wfcAttemptCount;
+        int _wfcSuccessCount;
+        int _wfcFailureCount;
+        int _wfcGenerationCount;
         float _lastWfcTime;
         float _minWfcTime = float.MaxValue;
         float _maxWfcTime;
@@ -124,19 +124,19 @@ namespace Rendering
 
                 return new ChunkMetrics
                 {
-                    ActiveChunks    = _chunks.Count,
-                    TotalGenerated  = _genCount,
-                    LastGenTimeMs   = _lastGenTime,
-                    AvgGenTimeMs    = _genCount > 0 ? _genTimeSum / _genCount : 0f,
-                    MinGenTimeMs    = _genCount > 0 ? _minGenTime : 0f,
-                    MaxGenTimeMs    = _maxGenTime,
-                    TotalAnalyzed   = _analysisCount,
+                    ActiveChunks = _chunks.Count,
+                    TotalGenerated = _genCount,
+                    LastGenTimeMs = _lastGenTime,
+                    AvgGenTimeMs = _genCount > 0 ? _genTimeSum / _genCount : 0f,
+                    MinGenTimeMs = _genCount > 0 ? _minGenTime : 0f,
+                    MaxGenTimeMs = _maxGenTime,
+                    TotalAnalyzed = _analysisCount,
                     LastAnalysisTimeMs = _lastAnalysisTime,
                     AvgAnalysisTimeMs = _analysisCount > 0 ? _analysisTimeSum / _analysisCount : 0f,
                     MinAnalysisTimeMs = _analysisCount > 0 ? _minAnalysisTime : 0f,
                     MaxAnalysisTimeMs = _maxAnalysisTime,
                     AllocatedMemoryMB = Profiler.GetTotalAllocatedMemoryLong() / (1024f * 1024f),
-                    GpuTextureMB      = gpuBytes / (1024f * 1024f),
+                    GpuTextureMB = gpuBytes / (1024f * 1024f),
                     VisibleBuildableCells = visibleBuildableCells,
                     VisibleBuildableRatio = visibleAnalyzedCells > 0
                         ? visibleBuildableCells / (float)visibleAnalyzedCells
@@ -160,9 +160,9 @@ namespace Rendering
             _terrainAnalyzer = new TerrainAnalyzer();
             _wfcGenerator = new WFCGenerator();
             _readback = new HeightmapReadback();
-            _meshGen  = new MeshGenerator(heightMultiplier, heightCurve);
+            _meshGen = new MeshGenerator(heightMultiplier, heightCurve);
             _buildingSpawner = new BuildingSpawner();
-            _viewer   = Camera.main.transform;
+            _viewer = Camera.main.transform;
             _analysisOverlayMaterial = CreateAnalysisOverlayMaterial();
 
             SyncTerrainMaterialSettings();
@@ -184,13 +184,13 @@ namespace Rendering
         void SetupFog()
         {
             float chunkWorldSize = noiseSettings.chunkSize - 1;
-            float maxViewDist    = viewDistance * chunkWorldSize;
+            float maxViewDist = viewDistance * chunkWorldSize;
 
-            RenderSettings.fog               = true;
-            RenderSettings.fogMode           = FogMode.Linear;
-            RenderSettings.fogStartDistance  = maxViewDist * 0.45f;
-            RenderSettings.fogEndDistance    = maxViewDist * 0.92f;
-            RenderSettings.fogColor          = fogColor;
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.Linear;
+            RenderSettings.fogStartDistance = maxViewDist * 0.45f;
+            RenderSettings.fogEndDistance = maxViewDist * 0.92f;
+            RenderSettings.fogColor = fogColor;
 
             Camera.main.backgroundColor = fogColor;
         }
@@ -213,8 +213,8 @@ namespace Rendering
                 new Vector3( extent, 0, -extent)
             };
             mesh.triangles = new[] { 0, 1, 2, 0, 2, 3 };
-            mesh.normals   = new[] { Vector3.up, Vector3.up, Vector3.up, Vector3.up };
-            mesh.uv        = new[] { new Vector2(0, 0), new Vector2(0, 1),
+            mesh.normals = new[] { Vector3.up, Vector3.up, Vector3.up, Vector3.up };
+            mesh.uv = new[] { new Vector2(0, 0), new Vector2(0, 1),
                                      new Vector2(1, 1), new Vector2(1, 0) };
             mesh.RecalculateBounds();
             mf.sharedMesh = mesh;
@@ -301,8 +301,8 @@ namespace Rendering
         {
             _pending.Add(coord);
             var chunk = new Chunk(coord) { State = ChunkState.GeneratingNoise };
-            chunk.RequestTime     = Time.realtimeSinceStartup;
-            chunk.GpuTexture      = _noiseGen.Dispatch(noiseSettings, coord, out var moistRT);
+            chunk.RequestTime = Time.realtimeSinceStartup;
+            chunk.GpuTexture = _noiseGen.Dispatch(noiseSettings, coord, out var moistRT);
             chunk.MoistureTexture = moistRT;
             _readback.Request(chunk, OnChunkReady);
         }

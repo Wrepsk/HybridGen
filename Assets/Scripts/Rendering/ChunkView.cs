@@ -4,8 +4,8 @@ namespace Rendering
 {
     public class ChunkView
     {
-        readonly GameObject   _go;
-        readonly MeshFilter   _filter;
+        readonly GameObject _go;
+        readonly MeshFilter _filter;
         readonly MeshRenderer _renderer;
 
         public ChunkView(Vector2Int coord, int chunkSize, Material material, Transform parent)

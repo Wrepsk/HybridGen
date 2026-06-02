@@ -4,9 +4,9 @@ namespace Rendering
 {
     public class FreeFlyCamera : MonoBehaviour
     {
-        [SerializeField] float moveSpeed        = 60f;
-        [SerializeField] float fastMultiplier   = 3f;
-        [SerializeField] float lookSensitivity  = 2f;
+        [SerializeField] float moveSpeed = 60f;
+        [SerializeField] float fastMultiplier = 3f;
+        [SerializeField] float lookSensitivity = 2f;
         [SerializeField] float scrollSensitivity = 15f;
 
         float _yaw;
@@ -14,7 +14,7 @@ namespace Rendering
 
         void Start()
         {
-            _yaw   = transform.eulerAngles.y;
+            _yaw = transform.eulerAngles.y;
             _pitch = transform.eulerAngles.x;
         }
 
@@ -22,22 +22,22 @@ namespace Rendering
         {
             if (Input.GetMouseButton(1))
             {
-                _yaw   += Input.GetAxis("Mouse X") * lookSensitivity;
+                _yaw += Input.GetAxis("Mouse X") * lookSensitivity;
                 _pitch -= Input.GetAxis("Mouse Y") * lookSensitivity;
-                _pitch  = Mathf.Clamp(_pitch, -90f, 90f);
+                _pitch = Mathf.Clamp(_pitch, -90f, 90f);
                 Cursor.lockState = CursorLockMode.Locked;
-                Cursor.visible   = false;
+                Cursor.visible = false;
             }
             else
             {
                 Cursor.lockState = CursorLockMode.None;
-                Cursor.visible   = true;
+                Cursor.visible = true;
             }
 
             transform.rotation = Quaternion.Euler(_pitch, _yaw, 0f);
 
             moveSpeed += Input.GetAxis("Mouse ScrollWheel") * scrollSensitivity;
-            moveSpeed  = Mathf.Max(1f, moveSpeed);
+            moveSpeed = Mathf.Max(1f, moveSpeed);
 
             float speed = moveSpeed * (Input.GetKey(KeyCode.LeftShift) ? fastMultiplier : 1f);
 

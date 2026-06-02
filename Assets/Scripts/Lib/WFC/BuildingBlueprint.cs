@@ -4,11 +4,11 @@ namespace Lib.WFC
 {
     public class BuildingBlueprint
     {
-        public Vector2Int      ChunkCoord       { get; }
-        public Vector2Int      FootprintOrigin  { get; }
-        public Vector2Int      FootprintSize    { get; }
-        public float           AverageScore     { get; }
-        public WFCPlacedTile[] Tiles            { get; }
+        public Vector2Int ChunkCoord { get; }
+        public Vector2Int FootprintOrigin { get; }
+        public Vector2Int FootprintSize { get; }
+        public float AverageScore { get; }
+        public WFCPlacedTile[] Tiles { get; }
 
         public BuildingBlueprint(
             Vector2Int chunkCoord,

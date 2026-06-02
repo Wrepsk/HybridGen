@@ -4,13 +4,13 @@ namespace Lib.TerrainAnalysis
 {
     public class TerrainChunkAnalysis
     {
-        public Vector2Int         ChunkCoord      { get; }
-        public int                CellsPerAxis    { get; }
-        public float              CellWorldSize   { get; }
-        public int                BuildableCount  { get; }
-        public int                BlockedCount    { get; }
-        public TerrainBuildCell[] Cells           { get; }
-        public int                TotalCellCount  => Cells?.Length ?? 0;
+        public Vector2Int ChunkCoord { get; }
+        public int CellsPerAxis { get; }
+        public float CellWorldSize { get; }
+        public int BuildableCount { get; }
+        public int BlockedCount { get; }
+        public TerrainBuildCell[] Cells { get; }
+        public int TotalCellCount  => Cells?.Length ?? 0;
 
         public TerrainChunkAnalysis(
             Vector2Int chunkCoord,
